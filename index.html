@@ -92,7 +92,7 @@
                 <h1 id="mainTitleDisplay" class="view-only text-3xl font-black tracking-widest text-gray-900">正在同步云端...</h1>
                 <input id="mainTitleInput" type="text" class="edit-only text-3xl font-black tracking-widest text-red-900 bg-transparent border-b-2 border-red-400 outline-none" placeholder="输入总标题" value="">
             </div>
-            <div class="flex items-center text-[11px] text-red-800 font-bold tracking-[0.4em] uppercase opacity-80 mt-2">
+            <div id="syncStatus" class="flex items-center text-[11px] text-red-800 font-bold tracking-[0.4em] uppercase opacity-80 mt-2 transition-all">
                 吉祥如意 <span class="mx-3 opacity-30">|</span> 婚礼管家
             </div>
         </div>
@@ -246,7 +246,6 @@
                     const tr = document.createElement('tr');
                     tr.className = "group border-b border-gray-100 last:border-0";
                     
-                    // 勾选状态样式判断
                     const isChecked = it.checked ? true : false;
                     const textStyle = isChecked ? 'text-gray-400 line-through decoration-gray-300 font-normal' : 'text-gray-900 font-bold';
                     const priceStyle = isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black';
@@ -254,12 +253,9 @@
                     tr.innerHTML = `
                         <td class="py-5 pl-2 w-full">
                             <div class="flex items-center gap-3">
-                                <button class="edit-only text-gray-400 hover:text-red-600 transition-colors" onclick="toggleCheck(${cIdx}, ${iIdx})">
+                                <button class="text-gray-400 hover:text-red-600 transition-colors focus:outline-none" onclick="toggleCheck(${cIdx}, ${iIdx})">
                                     <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700' : ''}"></i>
                                 </button>
-                                <div class="view-only text-gray-300">
-                                    <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700 opacity-80' : ''}"></i>
-                                </div>
                                 
                                 <div class="flex-1">
                                     <span class="view-only text-sm ${textStyle}">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
@@ -280,13 +276,42 @@
             lucide.createIcons();
         }
 
-        // 新增：切换勾选状态的函数
+        // 修改：切换勾选状态，并触发静默保存
         function toggleCheck(cIdx, iIdx) {
             const item = appData.tabs[currentTabIndex].columns[cIdx].items[iIdx];
             item.checked = !item.checked;
             renderItems(cIdx);
+            silentSave(); // 每次勾选后自动在后台保存
         }
 
+        // 新增：后台静默保存函数，不弹窗，只在标题栏下方小字提示
+        async function silentSave() {
+            const statusDiv = document.getElementById('syncStatus');
+            const originalHTML = `吉祥如意 <span class="mx-3 opacity-30">|</span> 婚礼管家`;
+            
+            // 显示正在保存
+            statusDiv.innerHTML = `<span class="text-green-600">☁️ 自动同步中...</span>`;
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify(appData)
+                });
+                // 保存成功提示
+                statusDiv.innerHTML = `<span class="text-green-600 tracking-widest">✓ 已同步</span>`;
+            } catch (e) {
+                // 保存失败提示
+                statusDiv.innerHTML = `<span class="text-red-600 tracking-widest">同步失败，请检查网络</span>`;
+            } finally {
+                // 2秒后恢复原状
+                setTimeout(() => {
+                    statusDiv.innerHTML = originalHTML;
+                }, 2000);
+            }
+        }
+
+        // --- 以下为原有编辑保存逻辑 ---
         async function saveEdit() { 
             const saveBtn = document.getElementById('saveBtn');
             const originalText = saveBtn.innerText;
@@ -298,10 +323,7 @@
             try {
                 const res = await fetch(API_URL, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': MASTER_KEY
-                    },
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
                     body: JSON.stringify(appData)
                 });
 
@@ -322,14 +344,11 @@
         }
 
         function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
-        
-        // 修改：新增行时，默认带有 checked: false 属性
         function addRow(cIdx) { 
             const col = appData.tabs[currentTabIndex].columns[cIdx]; 
             col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: '', checked: false}); 
             renderItems(cIdx); 
         }
-        
         function addColumn(type) { appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); renderColumns(); lucide.createIcons(); }
         function calcTotal(cIdx) { const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; }
         function deleteTab(i) { if(confirm("确认删除？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
