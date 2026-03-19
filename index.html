@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         :root {
             --jiang-red: #7f1d1d; 
@@ -82,6 +83,10 @@
         }
         .btn-main:active { transform: translateY(3px) scale(0.96); box-shadow: 0 1px 0px var(--jiang-red-dark); }
         .btn-main:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+        
+        /* 拖拽时的视觉反馈 */
+        .sortable-ghost { opacity: 0.4; background: #fff1f2; border-radius: 8px; }
+        .sortable-drag { cursor: grabbing !important; }
     </style>
 </head>
 <body class="view-mode">
@@ -133,6 +138,13 @@
 
         let currentTabIndex = 0;
         let backupData = "";
+        
+        // 工具函数：数组移动元素
+        function arrayMove(arr, fromIndex, toIndex) {
+            var element = arr[fromIndex];
+            arr.splice(fromIndex, 1);
+            arr.splice(toIndex, 0, element);
+        }
 
         window.onload = () => { loadFromCloud(); };
 
@@ -166,7 +178,7 @@
             appData.tabs.forEach((tab, index) => {
                 const active = index === currentTabIndex;
                 const div = document.createElement('div');
-                div.className = `tab-btn ${active ? 'active' : ''}`;
+                div.className = `tab-btn ${active ? 'active' : ''} tab-item`; // 添加 tab-item 标记
                 div.innerHTML = `
                     <span class="view-only" onclick="switchTab(${index})">${tab.name || '未命名阶段'}</span>
                     <input type="text" id="tab-input-${index}"
@@ -180,10 +192,30 @@
                 bar.appendChild(div);
             });
             const addBtn = document.createElement('button');
-            addBtn.className = "edit-only px-6 pb-4 text-gray-300 hover:text-red-800 transition";
+            addBtn.className = "edit-only px-6 pb-4 text-gray-300 hover:text-red-800 transition add-tab-btn"; // 标记不可拖动
             addBtn.innerHTML = `<i data-lucide="plus" class="w-6 h-6"></i>`;
             addBtn.onclick = () => { appData.tabs.push({name: '', columns: []}); switchTab(appData.tabs.length - 1); };
             bar.appendChild(addBtn);
+
+            // 激活页签拖拽排序
+            if (document.body.classList.contains('edit-mode')) {
+                Sortable.create(bar, {
+                    animation: 150,
+                    filter: '.add-tab-btn', // 过滤掉新增按钮
+                    onEnd: function (evt) {
+                        arrayMove(appData.tabs, evt.oldIndex, evt.newIndex);
+                        // 修正 active tab 索引
+                        if (currentTabIndex === evt.oldIndex) {
+                            currentTabIndex = evt.newIndex;
+                        } else if (currentTabIndex > evt.oldIndex && currentTabIndex <= evt.newIndex) {
+                            currentTabIndex--;
+                        } else if (currentTabIndex < evt.oldIndex && currentTabIndex >= evt.newIndex) {
+                            currentTabIndex++;
+                        }
+                        renderAll();
+                    }
+                });
+            }
         }
 
         function updateTabName(index, val) { appData.tabs[index].name = val; }
@@ -201,9 +233,10 @@
 
             currentTab.columns.forEach((col, cIdx) => {
                 const card = document.createElement('div');
-                card.className = "glass-card flex flex-col";
+                card.className = "glass-card flex flex-col column-item";
                 card.innerHTML = `
-                    <div class="red-header">
+                    <div class="red-header relative">
+                        <i data-lucide="grip-horizontal" class="col-drag-handle edit-only absolute left-6 top-1/2 -translate-y-1/2 cursor-grab text-rose-300 hover:text-white w-5 h-5"></i>
                         <div class="w-full flex justify-between items-center">
                             <div class="flex-1 flex justify-center items-center">
                                 <input type="text" class="edit-only text-lg font-bold border-b border-rose-300 w-full focus:border-white outline-none text-center bg-transparent text-white placeholder-rose-200" placeholder="请输入栏目名称" value="${col.title}" onchange="appData.tabs[currentTabIndex].columns[${cIdx}].title=this.value">
@@ -224,6 +257,18 @@
                 grid.appendChild(card);
                 renderItems(cIdx);
             });
+
+            // 激活栏目拖拽排序
+            if (document.body.classList.contains('edit-mode')) {
+                Sortable.create(grid, {
+                    animation: 150,
+                    handle: '.col-drag-handle', // 只能抓着手柄拖动
+                    onEnd: function (evt) {
+                        arrayMove(appData.tabs[currentTabIndex].columns, evt.oldIndex, evt.newIndex);
+                        renderColumns();
+                    }
+                });
+            }
         }
 
         function renderItems(cIdx) {
@@ -235,8 +280,9 @@
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const row = document.createElement('div');
-                    row.className = "flex items-center gap-6 group"; 
+                    row.className = "flex items-center gap-4 group list-item"; 
                     row.innerHTML = `
+                        <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
                         <div class="flex items-center gap-3 view-only shrink-0">
                             <span class="font-black text-red-900 text-sm tracking-tight">${it.time}</span>
                             <i data-lucide="clock" class="w-4 h-4 text-gray-400"></i>
@@ -244,14 +290,13 @@
                         <p class="view-only text-gray-900 font-semibold text-sm leading-relaxed flex-1">${it.desc || '<span class="text-gray-300 font-normal">未填写内容</span>'}</p>
                         <input type="time" class="edit-only text-xs border-none bg-gray-100 rounded p-1" value="${it.time}" onchange="updateVal(${cIdx}, ${iIdx}, 'time', this.value)">
                         <textarea class="edit-only flex-1 text-sm border-b border-transparent focus:border-red-200 resize-none outline-none py-1 bg-transparent font-semibold" placeholder="请输入流程或事项内容..." onchange="updateVal(${cIdx}, ${iIdx}, 'desc', this.value)" rows="1">${it.desc}</textarea>
-                        <button class="edit-only text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
+                        <button class="edit-only text-gray-300 hover:text-red-600 ml-2" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
                     `;
                     list.appendChild(row);
                 });
             } else if (col.type === 'list' || col.type === 'note') {
-                // 判断是记事本(纯数字)还是清单(带金钱)
                 const isList = col.type === 'list';
-                const footerText = isList ? '总计费用' : '总计';
+                const footerText = isList ? '总计费用' : '总计数量';
                 const prefix = isList ? '¥' : '';
                 const valueKey = isList ? 'price' : 'count';
                 const inputPlaceholder = isList ? '金额' : '数量';
@@ -265,7 +310,7 @@
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const tr = document.createElement('tr');
-                    tr.className = "group border-b border-gray-100 last:border-0";
+                    tr.className = "group border-b border-gray-100 last:border-0 list-item";
                     
                     const isChecked = it.checked ? true : false;
                     const textStyle = isChecked ? 'text-gray-400 line-through decoration-gray-300 font-normal' : 'text-gray-900 font-bold';
@@ -274,6 +319,7 @@
                     tr.innerHTML = `
                         <td class="py-5 pl-2 w-full">
                             <div class="flex items-center gap-3">
+                                <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
                                 <button class="text-gray-400 hover:text-red-600 transition-colors focus:outline-none" onclick="toggleCheck(${cIdx}, ${iIdx})">
                                     <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700' : ''}"></i>
                                 </button>
@@ -293,6 +339,20 @@
                 });
                 calcTotal(cIdx);
             }
+
+            // 激活条目拖拽排序
+            if (document.body.classList.contains('edit-mode')) {
+                const listElem = document.getElementById(`items-${cIdx}`);
+                Sortable.create(listElem, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    onEnd: function (evt) {
+                        arrayMove(appData.tabs[currentTabIndex].columns[cIdx].items, evt.oldIndex, evt.newIndex);
+                        renderItems(cIdx);
+                    }
+                });
+            }
+
             lucide.createIcons();
         }
 
@@ -303,7 +363,6 @@
             silentSave(); 
         }
 
-        // 把输入的 count 和 price 都强制转化为数字
         function updateVal(cIdx, iIdx, key, val) { 
             appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price' || key === 'count') ? Number(val) : val; 
         }
@@ -312,7 +371,7 @@
             const col = appData.tabs[currentTabIndex].columns[cIdx]; 
             if (col.type === 'flow') col.items.push({time: '12:00', desc: ''});
             else if (col.type === 'list') col.items.push({name: '', price: '', checked: false});
-            else if (col.type === 'note') col.items.push({name: '', count: '', checked: false}); // 新增记事本条目格式
+            else if (col.type === 'note') col.items.push({name: '', count: '', checked: false}); 
             renderItems(cIdx); 
         }
         
@@ -322,7 +381,6 @@
             lucide.createIcons(); 
         }
 
-        // 统计函数：区分不同模式
         function calcTotal(cIdx) { 
             const col = appData.tabs[currentTabIndex].columns[cIdx];
             if (col.type === 'list') {
