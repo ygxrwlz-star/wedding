@@ -105,12 +105,15 @@
 
     <main class="max-w-6xl mx-auto mt-16 px-8 pb-32 relative z-10">
         <div class="tabs-container mb-14" id="tabs-bar"></div>
-        <div class="edit-only mb-12 flex items-center gap-4">
+        <div class="edit-only mb-12 flex flex-wrap items-center gap-4">
             <button onclick="addColumn('flow')" class="btn-main px-7 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
                 <i data-lucide="plus" class="w-4 h-4"></i> 新增流程栏目
             </button>
             <button onclick="addColumn('list')" class="bg-white text-gray-800 px-7 py-3 rounded-xl text-xs font-bold border-2 border-gray-200 shadow-sm hover:border-red-200 transition-all flex items-center gap-2">
-                <i data-lucide="plus" class="w-4 h-4"></i> 新增清单栏目
+                <i data-lucide="plus" class="w-4 h-4"></i> 新增清单(金额)
+            </button>
+            <button onclick="addColumn('note')" class="bg-white text-gray-800 px-7 py-3 rounded-xl text-xs font-bold border-2 border-gray-200 shadow-sm hover:border-red-200 transition-all flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> 新增记事本(计数)
             </button>
         </div>
         <div id="columns-grid" class="grid grid-cols-1 md:grid-cols-2 gap-12 items-start transition-all duration-500"></div>
@@ -133,7 +136,6 @@
 
         window.onload = () => { loadFromCloud(); };
 
-        // 1. 初始化云端数据
         async function loadFromCloud() {
             try {
                 const res = await fetch(`${API_URL}/latest`, {
@@ -158,7 +160,6 @@
             lucide.createIcons();
         }
 
-        // 2. 渲染顶部页签 (修复编辑模式切换Bug)
         function renderTabs() {
             const bar = document.getElementById('tabs-bar');
             bar.innerHTML = '';
@@ -192,7 +193,6 @@
             renderAll(); 
         }
 
-        // 3. 渲染主栏目
         function renderColumns() {
             const grid = document.getElementById('columns-grid');
             grid.innerHTML = '';
@@ -226,7 +226,6 @@
             });
         }
 
-        // 4. 渲染具体条目 (含勾选逻辑)
         function renderItems(cIdx) {
             const col = appData.tabs[currentTabIndex].columns[cIdx];
             const container = document.getElementById(`col-content-${cIdx}`);
@@ -249,12 +248,20 @@
                     `;
                     list.appendChild(row);
                 });
-            } else {
+            } else if (col.type === 'list' || col.type === 'note') {
+                // 判断是记事本(纯数字)还是清单(带金钱)
+                const isList = col.type === 'list';
+                const footerText = isList ? '总计费用' : '总计';
+                const prefix = isList ? '¥' : '';
+                const valueKey = isList ? 'price' : 'count';
+                const inputPlaceholder = isList ? '金额' : '数量';
+
                 container.innerHTML = `
                     <table class="w-full">
                         <tbody id="items-${cIdx}"></tbody>
-                        <tfoot><tr><td class="pt-10 text-[11px] font-black text-gray-500 uppercase tracking-widest">总计费用</td><td class="pt-10 text-right text-red-800 text-2xl font-black" id="total-${cIdx}">¥0</td><td></td></tr></tfoot>
+                        <tfoot><tr><td class="pt-10 text-[11px] font-black text-gray-500 uppercase tracking-widest">${footerText}</td><td class="pt-10 text-right text-red-800 text-2xl font-black" id="total-${cIdx}">0</td><td></td></tr></tfoot>
                     </table>`;
+                
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const tr = document.createElement('tr');
@@ -272,13 +279,13 @@
                                 </button>
                                 <div class="flex-1">
                                     <span class="view-only text-sm ${textStyle}">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
-                                    <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent ${isChecked ? 'text-gray-400 font-normal' : 'text-gray-900 font-bold'}" placeholder="请输入物资或项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
+                                    <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent ${isChecked ? 'text-gray-400 font-normal' : 'text-gray-900 font-bold'}" placeholder="请输入项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
                                 </div>
                             </div>
                         </td>
                         <td class="py-5 text-right pr-2 whitespace-nowrap">
-                            <span class="${priceStyle} text-base view-only">¥${(it.price || 0).toLocaleString()}</span>
-                            <input type="number" class="edit-only w-24 text-right text-base border-none p-0 focus:ring-0 bg-transparent placeholder-red-300 ${isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black'}" placeholder="金额" value="${it.price || ''}" oninput="updateVal(${cIdx}, ${iIdx}, 'price', this.value); calcTotal(${cIdx})">
+                            <span class="${priceStyle} text-base view-only">${prefix}${(it[valueKey] || 0).toLocaleString()}</span>
+                            <input type="number" class="edit-only w-24 text-right text-base border-none p-0 focus:ring-0 bg-transparent placeholder-red-300 ${isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black'}" placeholder="${inputPlaceholder}" value="${it[valueKey] || ''}" oninput="updateVal(${cIdx}, ${iIdx}, '${valueKey}', this.value); calcTotal(${cIdx})">
                         </td>
                         <td class="edit-only pl-2"><button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button></td>
                     `;
@@ -289,19 +296,23 @@
             lucide.createIcons();
         }
 
-        // 5. 数据交互方法
         function toggleCheck(cIdx, iIdx) {
             const item = appData.tabs[currentTabIndex].columns[cIdx].items[iIdx];
             item.checked = !item.checked;
             renderItems(cIdx);
-            silentSave(); // 静默云端保存
+            silentSave(); 
         }
 
-        function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
+        // 把输入的 count 和 price 都强制转化为数字
+        function updateVal(cIdx, iIdx, key, val) { 
+            appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price' || key === 'count') ? Number(val) : val; 
+        }
         
         function addRow(cIdx) { 
             const col = appData.tabs[currentTabIndex].columns[cIdx]; 
-            col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: '', checked: false}); 
+            if (col.type === 'flow') col.items.push({time: '12:00', desc: ''});
+            else if (col.type === 'list') col.items.push({name: '', price: '', checked: false});
+            else if (col.type === 'note') col.items.push({name: '', count: '', checked: false}); // 新增记事本条目格式
             renderItems(cIdx); 
         }
         
@@ -311,16 +322,22 @@
             lucide.createIcons(); 
         }
 
+        // 统计函数：区分不同模式
         function calcTotal(cIdx) { 
-            const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); 
-            document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; 
+            const col = appData.tabs[currentTabIndex].columns[cIdx];
+            if (col.type === 'list') {
+                const t = col.items.reduce((s, i) => s + (i.price || 0), 0); 
+                document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; 
+            } else if (col.type === 'note') {
+                const t = col.items.reduce((s, i) => s + (i.count || 0), 0); 
+                document.getElementById(`total-${cIdx}`).innerText = `${t.toLocaleString()}`; 
+            }
         }
 
         function deleteTab(i) { if(confirm("确认删除阶段？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
         function deleteColumn(i) { if(confirm("确认删除栏目？")) { appData.tabs[currentTabIndex].columns.splice(i, 1); renderColumns(); lucide.createIcons(); } }
         function deleteItem(c, i) { appData.tabs[currentTabIndex].columns[c].items.splice(i, 1); renderItems(c); }
 
-        // 6. 核心编辑状态控制
         function enterEditMode() { 
             backupData = JSON.stringify(appData); 
             document.body.classList.add('edit-mode'); 
@@ -337,7 +354,6 @@
             } 
         }
 
-        // 7. 两种保存到云端的方法
         async function saveEdit() { 
             const saveBtn = document.getElementById('saveBtn');
             const originalText = saveBtn.innerText;
