@@ -90,7 +90,7 @@
         <div class="flex flex-col">
             <div class="flex items-center gap-5">
                 <h1 id="mainTitleDisplay" class="view-only text-3xl font-black tracking-widest text-gray-900">正在同步云端...</h1>
-                <input id="mainTitleInput" type="text" class="edit-only text-3xl font-black tracking-widest text-red-900 bg-transparent border-b-2 border-red-400 outline-none" value="">
+                <input id="mainTitleInput" type="text" class="edit-only text-3xl font-black tracking-widest text-red-900 bg-transparent border-b-2 border-red-400 outline-none" placeholder="输入总标题" value="">
             </div>
             <div class="flex items-center text-[11px] text-red-800 font-bold tracking-[0.4em] uppercase opacity-80 mt-2">
                 吉祥如意 <span class="mx-3 opacity-30">|</span> 婚礼管家
@@ -151,7 +151,7 @@
         }
 
         function renderAll() {
-            document.getElementById('mainTitleDisplay').innerText = appData.webTitle;
+            document.getElementById('mainTitleDisplay').innerText = appData.webTitle || '未命名标题';
             document.getElementById('mainTitleInput').value = appData.webTitle;
             renderTabs();
             renderColumns();
@@ -166,7 +166,8 @@
                 const div = document.createElement('div');
                 div.className = `tab-btn ${active ? 'active' : ''}`;
                 div.innerHTML = `
-                    <span onclick="switchTab(${index})">${tab.name}</span>
+                    <span class="view-only" onclick="switchTab(${index})">${tab.name || '未命名阶段'}</span>
+                    <input type="text" class="edit-only w-24 bg-transparent border-b border-red-200 outline-none text-center font-bold text-red-900 focus:border-red-500 placeholder-red-300" placeholder="阶段名称" value="${tab.name}" onchange="updateTabName(${index}, this.value)">
                     <button class="edit-only ml-3 text-gray-300 hover:text-red-600" onclick="deleteTab(${index})"><i data-lucide="x" class="w-4 h-4"></i></button>
                 `;
                 bar.appendChild(div);
@@ -174,8 +175,12 @@
             const addBtn = document.createElement('button');
             addBtn.className = "edit-only px-6 pb-4 text-gray-300 hover:text-red-800 transition";
             addBtn.innerHTML = `<i data-lucide="plus" class="w-6 h-6"></i>`;
-            addBtn.onclick = () => { appData.tabs.push({name: '新阶段', columns: []}); switchTab(appData.tabs.length - 1); };
+            addBtn.onclick = () => { appData.tabs.push({name: '', columns: []}); switchTab(appData.tabs.length - 1); };
             bar.appendChild(addBtn);
+        }
+
+        function updateTabName(index, val) {
+            appData.tabs[index].name = val;
         }
 
         function switchTab(index) {
@@ -196,9 +201,9 @@
                     <div class="red-header">
                         <div class="w-full flex justify-between items-center">
                             <div class="flex-1 flex justify-center items-center">
-                                <input type="text" class="edit-only text-lg font-bold border-b border-rose-300 w-full focus:border-white outline-none text-center bg-transparent text-white" value="${col.title}" onchange="appData.tabs[currentTabIndex].columns[${cIdx}].title=this.value">
+                                <input type="text" class="edit-only text-lg font-bold border-b border-rose-300 w-full focus:border-white outline-none text-center bg-transparent text-white placeholder-rose-200" placeholder="请输入栏目名称" value="${col.title}" onchange="appData.tabs[currentTabIndex].columns[${cIdx}].title=this.value">
                                 <h3 class="view-only text-xl font-bold flex items-center justify-center tracking-widest text-white">
-                                    <span class="deco-dot"></span>${col.title}<span class="deco-dot"></span>
+                                    <span class="deco-dot"></span>${col.title || '未命名栏目'}<span class="deco-dot"></span>
                                 </h3>
                             </div>
                             <button onclick="deleteColumn(${cIdx})" class="edit-only absolute right-6 text-rose-300 hover:text-white transition">
@@ -230,9 +235,9 @@
                             <span class="font-black text-red-900 text-sm tracking-tight">${it.time}</span>
                             <i data-lucide="clock" class="w-4 h-4 text-gray-400"></i>
                         </div>
-                        <p class="view-only text-gray-900 font-semibold text-sm leading-relaxed flex-1">${it.desc}</p>
+                        <p class="view-only text-gray-900 font-semibold text-sm leading-relaxed flex-1">${it.desc || '<span class="text-gray-300 font-normal">未填写内容</span>'}</p>
                         <input type="time" class="edit-only text-xs border-none bg-gray-100 rounded p-1" value="${it.time}" onchange="updateVal(${cIdx}, ${iIdx}, 'time', this.value)">
-                        <textarea class="edit-only flex-1 text-sm border-b border-transparent focus:border-red-200 resize-none outline-none py-1 bg-transparent font-semibold" onchange="updateVal(${cIdx}, ${iIdx}, 'desc', this.value)" rows="1">${it.desc}</textarea>
+                        <textarea class="edit-only flex-1 text-sm border-b border-transparent focus:border-red-200 resize-none outline-none py-1 bg-transparent font-semibold" placeholder="请输入流程或事项内容..." onchange="updateVal(${cIdx}, ${iIdx}, 'desc', this.value)" rows="1">${it.desc}</textarea>
                         <button class="edit-only text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
                     `;
                     list.appendChild(row);
@@ -249,12 +254,12 @@
                     tr.className = "group border-b border-gray-100 last:border-0";
                     tr.innerHTML = `
                         <td class="py-5 pl-2">
-                            <span class="view-only text-sm text-gray-900 font-bold">${it.name}</span>
-                            <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent font-bold" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
+                            <span class="view-only text-sm text-gray-900 font-bold">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
+                            <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent font-bold" placeholder="请输入物资或项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
                         </td>
                         <td class="py-5 text-right pr-2">
-                            <span class="font-black text-red-900 text-base view-only">¥${it.price.toLocaleString()}</span>
-                            <input type="number" class="edit-only w-24 text-right font-black text-base border-none p-0 focus:ring-0 text-red-900 bg-transparent" value="${it.price}" oninput="updateVal(${cIdx}, ${iIdx}, 'price', this.value); calcTotal(${cIdx})">
+                            <span class="font-black text-red-900 text-base view-only">¥${(it.price || 0).toLocaleString()}</span>
+                            <input type="number" class="edit-only w-24 text-right font-black text-base border-none p-0 focus:ring-0 text-red-900 bg-transparent placeholder-red-300" placeholder="金额" value="${it.price || ''}" oninput="updateVal(${cIdx}, ${iIdx}, 'price', this.value); calcTotal(${cIdx})">
                         </td>
                         <td class="edit-only pl-2"><button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button></td>
                     `;
@@ -300,8 +305,8 @@
         }
 
         function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
-        function addRow(cIdx) { const col = appData.tabs[currentTabIndex].columns[cIdx]; col.items.push(col.type === 'flow' ? {time: '12:00', desc: '新事项'} : {name: '新项目', price: 0}); renderItems(cIdx); }
-        function addColumn(type) { appData.tabs[currentTabIndex].columns.push({ type, title: type === 'flow' ? '流程日程' : '费用清单', items: [] }); renderColumns(); lucide.createIcons(); }
+        function addRow(cIdx) { const col = appData.tabs[currentTabIndex].columns[cIdx]; col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: ''}); renderItems(cIdx); }
+        function addColumn(type) { appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); renderColumns(); lucide.createIcons(); }
         function calcTotal(cIdx) { const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; }
         function deleteTab(i) { if(confirm("确认删除？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
         function deleteColumn(i) { if(confirm("确认删除？")) { appData.tabs[currentTabIndex].columns.splice(i, 1); renderColumns(); lucide.createIcons(); } }
