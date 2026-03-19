@@ -73,6 +73,8 @@
         .header-list { background: linear-gradient(135deg, #c28135 0%, #925c1d 50%, #4a2e0a 100%); }
         /* 记事本 - 黛蓝 */
         .header-note { background: linear-gradient(135deg, #516b75 0%, #2f4550 50%, #152229 100%); }
+        /* 人员安排 - 翠竹青 (新增) */
+        .header-personnel { background: linear-gradient(135deg, #4f7060 0%, #2f453a 50%, #15201b 100%); }
 
         .deco-dot {
             width: 8px; height: 8px; background: var(--gold-leaf);
@@ -125,6 +127,9 @@
             </button>
             <button onclick="addColumn('note')" class="bg-white text-gray-700 px-7 py-3 rounded-xl text-xs font-bold border-2 border-gray-100 shadow-sm hover:border-red-200 hover:text-red-800 transition-all flex items-center gap-2">
                 <i data-lucide="plus" class="w-4 h-4"></i> 新增记事本(计数)
+            </button>
+            <button onclick="addColumn('personnel')" class="bg-white text-gray-700 px-7 py-3 rounded-xl text-xs font-bold border-2 border-gray-100 shadow-sm hover:border-red-200 hover:text-red-800 transition-all flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> 新增人员安排
             </button>
         </div>
         <div id="columns-grid" class="grid grid-cols-1 md:grid-cols-2 gap-12 items-start transition-all duration-500"></div>
@@ -238,6 +243,7 @@
                 let headerClass = 'header-flow';
                 if (col.type === 'list') headerClass = 'header-list';
                 else if (col.type === 'note') headerClass = 'header-note';
+                else if (col.type === 'personnel') headerClass = 'header-personnel'; // 新增的墨绿色头部
 
                 card.innerHTML = `
                     <div class="card-header ${headerClass} relative">
@@ -404,6 +410,42 @@
                     list.appendChild(tr);
                 });
                 calcTotal(cIdx);
+            } else if (col.type === 'personnel') {
+                // =============== 新增：人员安排模式 ===============
+                container.innerHTML = `
+                    <table class="w-full">
+                        <tbody id="items-${cIdx}"></tbody>
+                    </table>`;
+                
+                const list = document.getElementById(`items-${cIdx}`);
+                col.items.forEach((it, iIdx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "group border-b border-gray-100 last:border-0 drag-item";
+
+                    tr.innerHTML = `
+                        <td class="py-5 pl-2 w-1/3 align-middle">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
+                                <div class="flex-1">
+                                    <span class="view-only text-sm text-gray-900 font-bold">${it.role || '<span class="text-gray-300 font-normal">职务</span>'}</span>
+                                    <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent text-gray-900 font-bold placeholder-gray-300" placeholder="职务 (如: 伴郎)" value="${it.role || ''}" onchange="updateVal(${cIdx}, ${iIdx}, 'role', this.value)">
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-5 px-3 w-1/3 align-middle">
+                            <span class="view-only text-sm text-gray-800 font-bold">${it.name || '<span class="text-gray-300 font-normal">姓名</span>'}</span>
+                            <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent text-gray-800 font-bold placeholder-gray-300" placeholder="人员姓名" value="${it.name || ''}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
+                        </td>
+                        <td class="py-5 text-right pr-2 w-1/3 whitespace-nowrap align-middle">
+                            <span class="view-only text-sm text-gray-500">${it.phone || '<span class="text-gray-300 font-normal">备注/电话</span>'}</span>
+                            <input type="text" class="edit-only w-full text-right border-none p-0 focus:ring-0 text-sm bg-transparent text-gray-500 placeholder-gray-300" placeholder="电话/备注" value="${it.phone || ''}" onchange="updateVal(${cIdx}, ${iIdx}, 'phone', this.value)">
+                        </td>
+                        <td class="edit-only pl-2 align-middle">
+                            <button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
+                        </td>
+                    `;
+                    list.appendChild(tr);
+                });
             }
 
             if (document.body.classList.contains('edit-mode')) {
@@ -437,11 +479,15 @@
             if (col.type === 'flow') col.items.push({time: '12:00', desc: ''});
             else if (col.type === 'list') col.items.push({name: '', price: '', count: 1, checked: false});
             else if (col.type === 'note') col.items.push({name: '', count: '', checked: false}); 
+            else if (col.type === 'personnel') col.items.push({role: '', name: '', phone: ''}); // 新增人员空数据
             renderItems(cIdx); 
         }
         
         function addColumn(type) { 
-            appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); 
+            let title = '';
+            if (type === 'personnel') title = '人员安排'; // 给人员栏目一个默认标题
+            
+            appData.tabs[currentTabIndex].columns.push({ type, title: title, items: [] }); 
             renderColumns(); 
             lucide.createIcons(); 
         }
