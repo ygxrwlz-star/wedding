@@ -178,7 +178,7 @@
             appData.tabs.forEach((tab, index) => {
                 const active = index === currentTabIndex;
                 const div = document.createElement('div');
-                div.className = `tab-btn ${active ? 'active' : ''} tab-item`; // 添加 tab-item 标记
+                div.className = `tab-btn ${active ? 'active' : ''} drag-item`;
                 div.innerHTML = `
                     <span class="view-only" onclick="switchTab(${index})">${tab.name || '未命名阶段'}</span>
                     <input type="text" id="tab-input-${index}"
@@ -192,7 +192,7 @@
                 bar.appendChild(div);
             });
             const addBtn = document.createElement('button');
-            addBtn.className = "edit-only px-6 pb-4 text-gray-300 hover:text-red-800 transition add-tab-btn"; // 标记不可拖动
+            addBtn.className = "edit-only px-6 pb-4 text-gray-300 hover:text-red-800 transition add-tab-btn";
             addBtn.innerHTML = `<i data-lucide="plus" class="w-6 h-6"></i>`;
             addBtn.onclick = () => { appData.tabs.push({name: '', columns: []}); switchTab(appData.tabs.length - 1); };
             bar.appendChild(addBtn);
@@ -233,7 +233,7 @@
 
             currentTab.columns.forEach((col, cIdx) => {
                 const card = document.createElement('div');
-                card.className = "glass-card flex flex-col column-item";
+                card.className = "glass-card flex flex-col drag-item";
                 card.innerHTML = `
                     <div class="red-header relative">
                         <i data-lucide="grip-horizontal" class="col-drag-handle edit-only absolute left-6 top-1/2 -translate-y-1/2 cursor-grab text-rose-300 hover:text-white w-5 h-5"></i>
@@ -280,7 +280,8 @@
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const row = document.createElement('div');
-                    row.className = "flex items-center gap-4 group list-item"; 
+                    // 修复点：将 list-item 改为了 drag-item，防止与 Tailwind CSS 内置属性冲突
+                    row.className = "flex items-center gap-4 group drag-item"; 
                     row.innerHTML = `
                         <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
                         <div class="flex items-center gap-3 view-only shrink-0">
@@ -310,7 +311,8 @@
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const tr = document.createElement('tr');
-                    tr.className = "group border-b border-gray-100 last:border-0 list-item";
+                    // 修复点：将 list-item 改为了 drag-item
+                    tr.className = "group border-b border-gray-100 last:border-0 drag-item";
                     
                     const isChecked = it.checked ? true : false;
                     const textStyle = isChecked ? 'text-gray-400 line-through decoration-gray-300 font-normal' : 'text-gray-900 font-bold';
