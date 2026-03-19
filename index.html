@@ -139,7 +139,6 @@
         let currentTabIndex = 0;
         let backupData = "";
         
-        // 工具函数：数组移动元素
         function arrayMove(arr, fromIndex, toIndex) {
             var element = arr[fromIndex];
             arr.splice(fromIndex, 1);
@@ -197,14 +196,12 @@
             addBtn.onclick = () => { appData.tabs.push({name: '', columns: []}); switchTab(appData.tabs.length - 1); };
             bar.appendChild(addBtn);
 
-            // 激活页签拖拽排序
             if (document.body.classList.contains('edit-mode')) {
                 Sortable.create(bar, {
                     animation: 150,
-                    filter: '.add-tab-btn', // 过滤掉新增按钮
+                    filter: '.add-tab-btn',
                     onEnd: function (evt) {
                         arrayMove(appData.tabs, evt.oldIndex, evt.newIndex);
-                        // 修正 active tab 索引
                         if (currentTabIndex === evt.oldIndex) {
                             currentTabIndex = evt.newIndex;
                         } else if (currentTabIndex > evt.oldIndex && currentTabIndex <= evt.newIndex) {
@@ -219,11 +216,7 @@
         }
 
         function updateTabName(index, val) { appData.tabs[index].name = val; }
-        
-        function switchTab(index) { 
-            currentTabIndex = index; 
-            renderAll(); 
-        }
+        function switchTab(index) { currentTabIndex = index; renderAll(); }
 
         function renderColumns() {
             const grid = document.getElementById('columns-grid');
@@ -258,11 +251,10 @@
                 renderItems(cIdx);
             });
 
-            // 激活栏目拖拽排序
             if (document.body.classList.contains('edit-mode')) {
                 Sortable.create(grid, {
                     animation: 150,
-                    handle: '.col-drag-handle', // 只能抓着手柄拖动
+                    handle: '.col-drag-handle',
                     onEnd: function (evt) {
                         arrayMove(appData.tabs[currentTabIndex].columns, evt.oldIndex, evt.newIndex);
                         renderColumns();
@@ -276,24 +268,37 @@
             const container = document.getElementById(`col-content-${cIdx}`);
             
             if(col.type === 'flow') {
-                container.innerHTML = `<div class="space-y-8" id="items-${cIdx}"></div>`;
+                container.innerHTML = `
+                    <table class="w-full">
+                        <tbody id="items-${cIdx}"></tbody>
+                    </table>`;
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
-                    const row = document.createElement('div');
-                    // 修复点：将 list-item 改为了 drag-item，防止与 Tailwind CSS 内置属性冲突
-                    row.className = "flex items-center gap-4 group drag-item"; 
-                    row.innerHTML = `
-                        <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
-                        <div class="flex items-center gap-3 view-only shrink-0">
-                            <span class="font-black text-red-900 text-sm tracking-tight">${it.time}</span>
-                            <i data-lucide="clock" class="w-4 h-4 text-gray-400"></i>
-                        </div>
-                        <p class="view-only text-gray-900 font-semibold text-sm leading-relaxed flex-1">${it.desc || '<span class="text-gray-300 font-normal">未填写内容</span>'}</p>
-                        <input type="time" class="edit-only text-xs border-none bg-gray-100 rounded p-1" value="${it.time}" onchange="updateVal(${cIdx}, ${iIdx}, 'time', this.value)">
-                        <textarea class="edit-only flex-1 text-sm border-b border-transparent focus:border-red-200 resize-none outline-none py-1 bg-transparent font-semibold" placeholder="请输入流程或事项内容..." onchange="updateVal(${cIdx}, ${iIdx}, 'desc', this.value)" rows="1">${it.desc}</textarea>
-                        <button class="edit-only text-gray-300 hover:text-red-600 ml-2" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
+                    const tr = document.createElement('tr');
+                    tr.className = "group border-b border-gray-100 last:border-0 drag-item";
+                    
+                    tr.innerHTML = `
+                        <td class="py-5 pl-2 w-full">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="grip-vertical" class="drag-handle edit-only cursor-grab text-gray-300 hover:text-red-600 w-5 h-5 shrink-0 transition"></i>
+                                
+                                <div class="flex items-center gap-2 view-only shrink-0 w-20">
+                                    <i data-lucide="clock" class="w-4 h-4 text-gray-400"></i>
+                                    <span class="text-red-900 font-black text-sm tracking-tight">${it.time}</span>
+                                </div>
+                                <input type="time" class="edit-only text-xs border-none bg-gray-100 rounded p-1 w-20 shrink-0 text-red-900 font-bold" value="${it.time}" onchange="updateVal(${cIdx}, ${iIdx}, 'time', this.value)">
+                                
+                                <div class="flex-1">
+                                    <span class="view-only text-sm text-gray-900 font-bold">${it.desc || '<span class="text-gray-300 font-normal">未填写内容</span>'}</span>
+                                    <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent text-gray-900 font-bold placeholder-gray-300" placeholder="请输入流程内容..." value="${it.desc}" onchange="updateVal(${cIdx}, ${iIdx}, 'desc', this.value)">
+                                </div>
+                            </div>
+                        </td>
+                        <td class="edit-only pl-2 align-middle">
+                            <button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
+                        </td>
                     `;
-                    list.appendChild(row);
+                    list.appendChild(tr);
                 });
             } else if (col.type === 'list' || col.type === 'note') {
                 const isList = col.type === 'list';
@@ -311,7 +316,6 @@
                 const list = document.getElementById(`items-${cIdx}`);
                 col.items.forEach((it, iIdx) => {
                     const tr = document.createElement('tr');
-                    // 修复点：将 list-item 改为了 drag-item
                     tr.className = "group border-b border-gray-100 last:border-0 drag-item";
                     
                     const isChecked = it.checked ? true : false;
@@ -331,18 +335,17 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="py-5 text-right pr-2 whitespace-nowrap">
+                        <td class="py-5 text-right pr-2 whitespace-nowrap align-middle">
                             <span class="${priceStyle} text-base view-only">${prefix}${(it[valueKey] || 0).toLocaleString()}</span>
                             <input type="number" class="edit-only w-24 text-right text-base border-none p-0 focus:ring-0 bg-transparent placeholder-red-300 ${isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black'}" placeholder="${inputPlaceholder}" value="${it[valueKey] || ''}" oninput="updateVal(${cIdx}, ${iIdx}, '${valueKey}', this.value); calcTotal(${cIdx})">
                         </td>
-                        <td class="edit-only pl-2"><button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button></td>
+                        <td class="edit-only pl-2 align-middle"><button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button></td>
                     `;
                     list.appendChild(tr);
                 });
                 calcTotal(cIdx);
             }
 
-            // 激活条目拖拽排序
             if (document.body.classList.contains('edit-mode')) {
                 const listElem = document.getElementById(`items-${cIdx}`);
                 Sortable.create(listElem, {
