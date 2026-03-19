@@ -133,6 +133,7 @@
 
         window.onload = () => { loadFromCloud(); };
 
+        // 1. 初始化云端数据
         async function loadFromCloud() {
             try {
                 const res = await fetch(`${API_URL}/latest`, {
@@ -157,6 +158,7 @@
             lucide.createIcons();
         }
 
+        // 2. 渲染顶部页签 (修复编辑模式切换Bug)
         function renderTabs() {
             const bar = document.getElementById('tabs-bar');
             bar.innerHTML = '';
@@ -166,7 +168,12 @@
                 div.className = `tab-btn ${active ? 'active' : ''}`;
                 div.innerHTML = `
                     <span class="view-only" onclick="switchTab(${index})">${tab.name || '未命名阶段'}</span>
-                    <input type="text" class="edit-only w-24 bg-transparent border-b border-red-200 outline-none text-center font-bold text-red-900 focus:border-red-500 placeholder-red-300" placeholder="阶段名称" value="${tab.name}" onchange="updateTabName(${index}, this.value)">
+                    <input type="text" id="tab-input-${index}"
+                           class="edit-only w-24 bg-transparent border-b ${active ? 'border-red-400' : 'border-red-200 cursor-pointer'} outline-none text-center font-bold text-red-900 focus:border-red-500 placeholder-red-300" 
+                           placeholder="阶段名称" 
+                           value="${tab.name}" 
+                           onclick="if(${currentTabIndex} !== ${index}) { switchTab(${index}); setTimeout(() => document.getElementById('tab-input-${index}').focus(), 50); }"
+                           onchange="updateTabName(${index}, this.value)">
                     <button class="edit-only ml-3 text-gray-300 hover:text-red-600" onclick="deleteTab(${index})"><i data-lucide="x" class="w-4 h-4"></i></button>
                 `;
                 bar.appendChild(div);
@@ -179,8 +186,13 @@
         }
 
         function updateTabName(index, val) { appData.tabs[index].name = val; }
-        function switchTab(index) { currentTabIndex = index; renderAll(); }
+        
+        function switchTab(index) { 
+            currentTabIndex = index; 
+            renderAll(); 
+        }
 
+        // 3. 渲染主栏目
         function renderColumns() {
             const grid = document.getElementById('columns-grid');
             grid.innerHTML = '';
@@ -214,9 +226,11 @@
             });
         }
 
+        // 4. 渲染具体条目 (含勾选逻辑)
         function renderItems(cIdx) {
             const col = appData.tabs[currentTabIndex].columns[cIdx];
             const container = document.getElementById(`col-content-${cIdx}`);
+            
             if(col.type === 'flow') {
                 container.innerHTML = `<div class="space-y-8" id="items-${cIdx}"></div>`;
                 const list = document.getElementById(`items-${cIdx}`);
@@ -256,7 +270,6 @@
                                 <button class="text-gray-400 hover:text-red-600 transition-colors focus:outline-none" onclick="toggleCheck(${cIdx}, ${iIdx})">
                                     <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700' : ''}"></i>
                                 </button>
-                                
                                 <div class="flex-1">
                                     <span class="view-only text-sm ${textStyle}">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
                                     <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent ${isChecked ? 'text-gray-400 font-normal' : 'text-gray-900 font-bold'}" placeholder="请输入物资或项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
@@ -276,46 +289,59 @@
             lucide.createIcons();
         }
 
-        // 修改：切换勾选状态，并触发静默保存
+        // 5. 数据交互方法
         function toggleCheck(cIdx, iIdx) {
             const item = appData.tabs[currentTabIndex].columns[cIdx].items[iIdx];
             item.checked = !item.checked;
             renderItems(cIdx);
-            silentSave(); // 每次勾选后自动在后台保存
+            silentSave(); // 静默云端保存
         }
 
-        // 新增：后台静默保存函数，不弹窗，只在标题栏下方小字提示
-        async function silentSave() {
-            const statusDiv = document.getElementById('syncStatus');
-            const originalHTML = `吉祥如意 <span class="mx-3 opacity-30">|</span> 婚礼管家`;
-            
-            // 显示正在保存
-            statusDiv.innerHTML = `<span class="text-green-600">☁️ 自动同步中...</span>`;
-            
-            try {
-                await fetch(API_URL, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                    body: JSON.stringify(appData)
-                });
-                // 保存成功提示
-                statusDiv.innerHTML = `<span class="text-green-600 tracking-widest">✓ 已同步</span>`;
-            } catch (e) {
-                // 保存失败提示
-                statusDiv.innerHTML = `<span class="text-red-600 tracking-widest">同步失败，请检查网络</span>`;
-            } finally {
-                // 2秒后恢复原状
-                setTimeout(() => {
-                    statusDiv.innerHTML = originalHTML;
-                }, 2000);
-            }
+        function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
+        
+        function addRow(cIdx) { 
+            const col = appData.tabs[currentTabIndex].columns[cIdx]; 
+            col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: '', checked: false}); 
+            renderItems(cIdx); 
+        }
+        
+        function addColumn(type) { 
+            appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); 
+            renderColumns(); 
+            lucide.createIcons(); 
         }
 
-        // --- 以下为原有编辑保存逻辑 ---
+        function calcTotal(cIdx) { 
+            const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); 
+            document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; 
+        }
+
+        function deleteTab(i) { if(confirm("确认删除阶段？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
+        function deleteColumn(i) { if(confirm("确认删除栏目？")) { appData.tabs[currentTabIndex].columns.splice(i, 1); renderColumns(); lucide.createIcons(); } }
+        function deleteItem(c, i) { appData.tabs[currentTabIndex].columns[c].items.splice(i, 1); renderItems(c); }
+
+        // 6. 核心编辑状态控制
+        function enterEditMode() { 
+            backupData = JSON.stringify(appData); 
+            document.body.classList.add('edit-mode'); 
+            document.body.classList.remove('view-mode'); 
+            renderAll(); 
+        }
+
+        function cancelEdit() { 
+            if(confirm("确定撤销所有未保存的修改？")) { 
+                appData = JSON.parse(backupData); 
+                document.body.classList.add('view-mode'); 
+                document.body.classList.remove('edit-mode'); 
+                renderAll(); 
+            } 
+        }
+
+        // 7. 两种保存到云端的方法
         async function saveEdit() { 
             const saveBtn = document.getElementById('saveBtn');
             const originalText = saveBtn.innerText;
-            saveBtn.innerText = "正在同步到云端...";
+            saveBtn.innerText = "正在同步...";
             saveBtn.disabled = true;
 
             appData.webTitle = document.getElementById('mainTitleInput').value;
@@ -343,19 +369,25 @@
             }
         }
 
-        function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
-        function addRow(cIdx) { 
-            const col = appData.tabs[currentTabIndex].columns[cIdx]; 
-            col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: '', checked: false}); 
-            renderItems(cIdx); 
+        async function silentSave() {
+            const statusDiv = document.getElementById('syncStatus');
+            const originalHTML = `吉祥如意 <span class="mx-3 opacity-30">|</span> 婚礼管家`;
+            
+            statusDiv.innerHTML = `<span class="text-green-600">☁️ 自动同步中...</span>`;
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                    body: JSON.stringify(appData)
+                });
+                statusDiv.innerHTML = `<span class="text-green-600 tracking-widest">✓ 已同步</span>`;
+            } catch (e) {
+                statusDiv.innerHTML = `<span class="text-red-600 tracking-widest">同步失败，请检查网络</span>`;
+            } finally {
+                setTimeout(() => { statusDiv.innerHTML = originalHTML; }, 2000);
+            }
         }
-        function addColumn(type) { appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); renderColumns(); lucide.createIcons(); }
-        function calcTotal(cIdx) { const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; }
-        function deleteTab(i) { if(confirm("确认删除？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
-        function deleteColumn(i) { if(confirm("确认删除？")) { appData.tabs[currentTabIndex].columns.splice(i, 1); renderColumns(); lucide.createIcons(); } }
-        function deleteItem(c, i) { appData.tabs[currentTabIndex].columns[c].items.splice(i, 1); renderItems(c); }
-        function enterEditMode() { backupData = JSON.stringify(appData); document.body.classList.add('edit-mode'); document.body.classList.remove('view-mode'); renderAll(); }
-        function cancelEdit() { if(confirm("撤销修改？")) { appData = JSON.parse(backupData); document.body.classList.add('view-mode'); document.body.classList.remove('edit-mode'); renderAll(); } }
     </script>
 </body>
 </html>
