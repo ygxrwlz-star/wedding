@@ -60,13 +60,19 @@
         }
         @keyframes cardAppear { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        .red-header {
-            background: linear-gradient(135deg, var(--jiang-red-light) 0%, var(--jiang-red) 50%, var(--jiang-red-dark) 100%);
+        /* ====== 重构后的卡片头部样式 ====== */
+        .card-header {
             color: #ffffff;
             padding: 3.5rem 2rem 2.2rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
         }
+        /* 流程栏 - 绛红 */
+        .header-flow { background: linear-gradient(135deg, var(--jiang-red-light) 0%, var(--jiang-red) 50%, var(--jiang-red-dark) 100%); }
+        /* 清单栏 - 金棕 */
+        .header-list { background: linear-gradient(135deg, #c28135 0%, #925c1d 50%, #4a2e0a 100%); }
+        /* 记事本 - 黛蓝 */
+        .header-note { background: linear-gradient(135deg, #516b75 0%, #2f4550 50%, #152229 100%); }
 
         .deco-dot {
             width: 8px; height: 8px; background: var(--gold-leaf);
@@ -227,17 +233,23 @@
             currentTab.columns.forEach((col, cIdx) => {
                 const card = document.createElement('div');
                 card.className = "glass-card flex flex-col drag-item";
+                
+                // 根据类型匹配不同的头部颜色类名
+                let headerClass = 'header-flow';
+                if (col.type === 'list') headerClass = 'header-list';
+                else if (col.type === 'note') headerClass = 'header-note';
+
                 card.innerHTML = `
-                    <div class="red-header relative">
-                        <i data-lucide="grip-horizontal" class="col-drag-handle edit-only absolute left-6 top-1/2 -translate-y-1/2 cursor-grab text-rose-300 hover:text-white w-5 h-5"></i>
+                    <div class="card-header ${headerClass} relative">
+                        <i data-lucide="grip-horizontal" class="col-drag-handle edit-only absolute left-6 top-1/2 -translate-y-1/2 cursor-grab text-rose-200 hover:text-white w-5 h-5"></i>
                         <div class="w-full flex justify-between items-center">
                             <div class="flex-1 flex justify-center items-center">
-                                <input type="text" class="edit-only text-lg font-bold border-b border-rose-300 w-full focus:border-white outline-none text-center bg-transparent text-white placeholder-rose-200" placeholder="请输入栏目名称" value="${col.title}" onchange="appData.tabs[currentTabIndex].columns[${cIdx}].title=this.value">
+                                <input type="text" class="edit-only text-lg font-bold border-b border-rose-200 w-full focus:border-white outline-none text-center bg-transparent text-white placeholder-rose-200" placeholder="请输入栏目名称" value="${col.title}" onchange="appData.tabs[currentTabIndex].columns[${cIdx}].title=this.value">
                                 <h3 class="view-only text-xl font-bold flex items-center justify-center tracking-widest text-white">
                                     <span class="deco-dot"></span>${col.title || '未命名栏目'}<span class="deco-dot"></span>
                                 </h3>
                             </div>
-                            <button onclick="deleteColumn(${cIdx})" class="edit-only absolute right-6 text-rose-300 hover:text-white transition">
+                            <button onclick="deleteColumn(${cIdx})" class="edit-only absolute right-6 text-rose-200 hover:text-white transition">
                                 <i data-lucide="trash-2" class="w-5 h-5"></i>
                             </button>
                         </div>
@@ -301,7 +313,6 @@
                     list.appendChild(tr);
                 });
             } else if (col.type === 'list') {
-                // =============== 物资清单模式：单价 × 数量 ===============
                 container.innerHTML = `
                     <table class="w-full">
                         <tbody id="items-${cIdx}"></tbody>
@@ -317,7 +328,6 @@
                     const textStyle = isChecked ? 'text-gray-400 line-through decoration-gray-300 font-normal' : 'text-gray-900 font-bold';
                     const priceStyle = isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black';
 
-                    // 默认数量为1，计算初始总价
                     const countVal = (it.count === undefined || it.count === '') ? 1 : Number(it.count);
                     const priceVal = Number(it.price || 0);
                     const itemTotal = priceVal * countVal;
@@ -357,7 +367,6 @@
                 });
                 calcTotal(cIdx);
             } else if (col.type === 'note') {
-                // =============== 记事本模式：纯数量统计 ===============
                 container.innerHTML = `
                     <table class="w-full">
                         <tbody id="items-${cIdx}"></tbody>
@@ -426,7 +435,6 @@
         function addRow(cIdx) { 
             const col = appData.tabs[currentTabIndex].columns[cIdx]; 
             if (col.type === 'flow') col.items.push({time: '12:00', desc: ''});
-            // 清单默认数量给 1，方便直接算单价总额
             else if (col.type === 'list') col.items.push({name: '', price: '', count: 1, checked: false});
             else if (col.type === 'note') col.items.push({name: '', count: '', checked: false}); 
             renderItems(cIdx); 
@@ -443,13 +451,11 @@
             if (col.type === 'list') {
                 let total = 0;
                 col.items.forEach((it, iIdx) => {
-                    // 动态计算每一行的总额（没有数量默认按1算）
                     const countVal = (it.count === undefined || it.count === '') ? 1 : Number(it.count);
                     const priceVal = Number(it.price || 0);
                     const itemTotal = priceVal * countVal;
                     total += itemTotal;
                     
-                    // 实时更新当前行的总额展示
                     const itemTotalEl = document.getElementById(`item-total-${cIdx}-${iIdx}`);
                     if (itemTotalEl) {
                         itemTotalEl.innerText = `¥${itemTotal.toLocaleString()}`;
