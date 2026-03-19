@@ -133,7 +133,6 @@
 
         window.onload = () => { loadFromCloud(); };
 
-        // 从云端加载
         async function loadFromCloud() {
             try {
                 const res = await fetch(`${API_URL}/latest`, {
@@ -179,14 +178,8 @@
             bar.appendChild(addBtn);
         }
 
-        function updateTabName(index, val) {
-            appData.tabs[index].name = val;
-        }
-
-        function switchTab(index) {
-            currentTabIndex = index;
-            renderAll();
-        }
+        function updateTabName(index, val) { appData.tabs[index].name = val; }
+        function switchTab(index) { currentTabIndex = index; renderAll(); }
 
         function renderColumns() {
             const grid = document.getElementById('columns-grid');
@@ -252,14 +245,31 @@
                 col.items.forEach((it, iIdx) => {
                     const tr = document.createElement('tr');
                     tr.className = "group border-b border-gray-100 last:border-0";
+                    
+                    // 勾选状态样式判断
+                    const isChecked = it.checked ? true : false;
+                    const textStyle = isChecked ? 'text-gray-400 line-through decoration-gray-300 font-normal' : 'text-gray-900 font-bold';
+                    const priceStyle = isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black';
+
                     tr.innerHTML = `
-                        <td class="py-5 pl-2">
-                            <span class="view-only text-sm text-gray-900 font-bold">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
-                            <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent font-bold" placeholder="请输入物资或项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
+                        <td class="py-5 pl-2 w-full">
+                            <div class="flex items-center gap-3">
+                                <button class="edit-only text-gray-400 hover:text-red-600 transition-colors" onclick="toggleCheck(${cIdx}, ${iIdx})">
+                                    <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700' : ''}"></i>
+                                </button>
+                                <div class="view-only text-gray-300">
+                                    <i data-lucide="${isChecked ? 'check-square' : 'square'}" class="w-5 h-5 ${isChecked ? 'text-red-700 opacity-80' : ''}"></i>
+                                </div>
+                                
+                                <div class="flex-1">
+                                    <span class="view-only text-sm ${textStyle}">${it.name || '<span class="text-gray-300 font-normal">未命名项目</span>'}</span>
+                                    <input type="text" class="edit-only w-full border-none p-0 focus:ring-0 text-sm bg-transparent ${isChecked ? 'text-gray-400 font-normal' : 'text-gray-900 font-bold'}" placeholder="请输入物资或项目名称" value="${it.name}" onchange="updateVal(${cIdx}, ${iIdx}, 'name', this.value)">
+                                </div>
+                            </div>
                         </td>
-                        <td class="py-5 text-right pr-2">
-                            <span class="font-black text-red-900 text-base view-only">¥${(it.price || 0).toLocaleString()}</span>
-                            <input type="number" class="edit-only w-24 text-right font-black text-base border-none p-0 focus:ring-0 text-red-900 bg-transparent placeholder-red-300" placeholder="金额" value="${it.price || ''}" oninput="updateVal(${cIdx}, ${iIdx}, 'price', this.value); calcTotal(${cIdx})">
+                        <td class="py-5 text-right pr-2 whitespace-nowrap">
+                            <span class="${priceStyle} text-base view-only">¥${(it.price || 0).toLocaleString()}</span>
+                            <input type="number" class="edit-only w-24 text-right text-base border-none p-0 focus:ring-0 bg-transparent placeholder-red-300 ${isChecked ? 'text-gray-400 font-normal' : 'text-red-900 font-black'}" placeholder="金额" value="${it.price || ''}" oninput="updateVal(${cIdx}, ${iIdx}, 'price', this.value); calcTotal(${cIdx})">
                         </td>
                         <td class="edit-only pl-2"><button class="text-gray-300 hover:text-red-600" onclick="deleteItem(${cIdx}, ${iIdx})"><i data-lucide="minus-circle" class="w-4 h-4"></i></button></td>
                     `;
@@ -268,6 +278,13 @@
                 calcTotal(cIdx);
             }
             lucide.createIcons();
+        }
+
+        // 新增：切换勾选状态的函数
+        function toggleCheck(cIdx, iIdx) {
+            const item = appData.tabs[currentTabIndex].columns[cIdx].items[iIdx];
+            item.checked = !item.checked;
+            renderItems(cIdx);
         }
 
         async function saveEdit() { 
@@ -305,7 +322,14 @@
         }
 
         function updateVal(cIdx, iIdx, key, val) { appData.tabs[currentTabIndex].columns[cIdx].items[iIdx][key] = (key === 'price') ? Number(val) : val; }
-        function addRow(cIdx) { const col = appData.tabs[currentTabIndex].columns[cIdx]; col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: ''}); renderItems(cIdx); }
+        
+        // 修改：新增行时，默认带有 checked: false 属性
+        function addRow(cIdx) { 
+            const col = appData.tabs[currentTabIndex].columns[cIdx]; 
+            col.items.push(col.type === 'flow' ? {time: '12:00', desc: ''} : {name: '', price: '', checked: false}); 
+            renderItems(cIdx); 
+        }
+        
         function addColumn(type) { appData.tabs[currentTabIndex].columns.push({ type, title: '', items: [] }); renderColumns(); lucide.createIcons(); }
         function calcTotal(cIdx) { const t = appData.tabs[currentTabIndex].columns[cIdx].items.reduce((s, i) => s + (i.price || 0), 0); document.getElementById(`total-${cIdx}`).innerText = `¥${t.toLocaleString()}`; }
         function deleteTab(i) { if(confirm("确认删除？")) { appData.tabs.splice(i, 1); currentTabIndex = 0; renderAll(); } }
